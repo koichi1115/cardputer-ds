@@ -1,0 +1,79 @@
+/*
+ * CardputerZero DS化: 外付け 2.8" ILI9341 (SPI0 CE1) + XPT2046 タッチ (SPI0 CS2=G22)
+ *
+ * EXT 配線:
+ *   LCD CS   <- G7 (CE1)      LCD DC  <- G23      LCD RESET <- G14
+ *   LCD SCK  <- G11           LCD SDI <- G10      LCD SDO   :  未接続
+ *   T_CLK    <- G11           T_DIN   <- G10      T_DO      <- G9
+ *   T_CS     <- G22 (CS2)     T_IRQ   <- G26
+ *   VCC/LED  <- 5V OUT        GND     <- G
+ */
+/dts-v1/;
+/plugin/;
+/ {
+    compatible = "brcm,bcm2835";
+
+    fragment@0 {                       /* CE1 の spidev を外す */
+        target = <&spidev1>;
+        __overlay__ { status = "disabled"; };
+    };
+
+    fragment@1 {
+        target = <&gpio>;
+        __overlay__ {
+            ds_touch_pins: ds_touch_pins {
+                brcm,pins = <26>;
+                brcm,function = <0>;   /* input */
+                brcm,pull = <2>;       /* pull-up */
+            };
+        };
+    };
+
+    fragment@2 {
+        target = <&spi0>;
+        __overlay__ {
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            ili9341@1 {
+                /* 1つ目の compatible が /lib/firmware/<名前>.bin の初期化データ名になる。
+                   2つ目は M5 版 panel-mipi-dbi ドライバに合わせる(標準版を読ませない) */
+                compatible = "cardputerzero,ili9341_ext", "panel-mipi-dbi-m5stack";
+                reg = <1>;
+                spi-max-frequency = <32000000>;
+                dc-gpios = <&gpio 23 0>;
+                /* mipi-dbi は reset を active-high 表記で扱う(0 が正しい) */
+                reset-gpios = <&gpio 14 0>;
+                write-only;
+                format = "r5g6b5";
+                width-mm = <58>;
+                height-mm = <43>;
+                panel-timing {
+                    hactive = <320>; vactive = <240>;
+                    hback-porch = <0>; vback-porch = <0>;
+                    hfront-porch = <0>; vfront-porch = <0>;
+                    hsync-len = <0>; vsync-len = <0>;
+                    clock-frequency = <0>;
+                };
+            };
+
+            touch@2 {
+                compatible = "ti,ads7846";
+                reg = <2>;
+                spi-max-frequency = <2000000>;
+                pinctrl-names = "default";
+                pinctrl-0 = <&ds_touch_pins>;
+                interrupt-parent = <&gpio>;
+                interrupts = <26 2>;
+                pendown-gpio = <&gpio 26 1>;
+                ti,x-plate-ohms = /bits/ 16 <60>;
+                ti,pressure-max = /bits/ 16 <255>;
+            };
+        };
+    };
+
+    fragment@3 {                       /* EXT の 5V 出力を起動時に ON */
+        target-path = "/leds/ext_5v_out";
+        __overlay__ { default-state = "on"; };
+    };
+};

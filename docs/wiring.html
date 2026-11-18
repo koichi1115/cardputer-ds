@@ -1,0 +1,283 @@
+<title>DS化 配線図</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: one column — safety notes, the wiring diagram (scrolls sideways on phones), then a wire-by-wire checklist */
+:root{
+  --bg:#f5f6f7; --fg:#1d2329; --muted:#5b6672; --card:#ffffff; --line:#d6dce2;
+  --board:#f2efe6; --board-edge:#cdc6b3; --hole:#43403a; --socket:#20242a; --socket-hole:#000;
+  --pcb:#c5362c; --screen:#8f99a3; --pin:#c9a227;
+  --w-5v:#e0362c; --w-gnd:#2b2f33; --w-cs:#f08c00; --w-dc:#e8c100; --w-sdi:#2f9e44; --w-sck:#1c7ed6;
+  --w-tcs:#9c36b5; --w-tdo:#8d6e63; --w-tirq:#e64980; --w-rst:#0ca678;
+  --warn-bg:#fff2df; --warn-fg:#7a4300; --warn-line:#f0c48a; --ok:#2f9e44;
+  --f-body:"BIZ UDPGothic","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#13171b; --fg:#e5e9ed; --muted:#9aa5b1; --card:#1b2127; --line:#2b333b;
+  --warn-bg:#2d2213; --warn-fg:#f3c98b; --warn-line:#5c4420; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#13171b; --fg:#e5e9ed; --muted:#9aa5b1; --card:#1b2127; --line:#2b333b;
+  --warn-bg:#2d2213; --warn-fg:#f3c98b; --warn-line:#5c4420; color-scheme:dark }
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.65}
+.wrap{max-width:960px;margin:0 auto;padding-block:24px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:grid;gap:20px}
+h1{font-size:1.5rem;margin:0;text-wrap:balance}
+h2{font-size:1.1rem;margin:0 0 8px}
+p{margin:0}
+.lead{color:var(--muted)}
+.warn{background:var(--warn-bg);color:var(--warn-fg);border:1px solid var(--warn-line);border-radius:10px;padding:12px 16px}
+.warn ul{margin:6px 0 0;padding-left:1.2em}
+.mono{font-family:var(--f-mono);font-weight:700}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--card)}
+.seg button{font:inherit;border:0;background:transparent;color:var(--fg);padding:6px 14px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.seg button:focus-visible{outline:2px solid var(--w-sck);outline-offset:-2px}
+.diagram{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
+.diagram svg{display:block;min-width:700px;width:100%;height:auto}
+.dim .touch{opacity:.12}
+.legend{color:var(--muted);font-size:.9rem}
+.list{display:grid;gap:18px}
+.group{min-width:0}
+.item{display:grid;grid-template-columns:auto 14px 1fr auto;gap:10px;align-items:center;
+  padding:10px 12px;border-bottom:1px solid var(--line);background:var(--card)}
+.group .item:first-of-type{border-top-left-radius:10px;border-top-right-radius:10px}
+.group .item:last-of-type{border-bottom:0;border-bottom-left-radius:10px;border-bottom-right-radius:10px}
+.box{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.item input{width:20px;height:20px;accent-color:var(--ok)}
+.sw{width:14px;height:14px;border-radius:50%}
+.item label{cursor:pointer;min-width:0}
+.item .to{color:var(--muted);font-size:.88rem}
+.tag{font-size:.75rem;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.item.done label{text-decoration:line-through;color:var(--muted)}
+.dim .item.touch{display:none}
+.progress{font-variant-numeric:tabular-nums;color:var(--muted)}
+@media (prefers-reduced-motion: no-preference){.touch{transition:opacity .2s}}
+</style>
+
+<div class="wrap" id="root">
+  <header style="display:grid;gap:6px">
+    <h1>CardputerZero DS化 配線図</h1>
+    <p class="lead">2.8インチ液晶（ILI9341＋タッチ）をブレッドボード経由で EXT につなぐ図です。液晶は A列の1〜14行目、画面を上にして本体は左へはみ出す向きです。</p>
+  </header>
+
+  <div class="warn">
+    <strong>作業の前に</strong>
+    <ul>
+      <li>Cardputer の<strong>電源を切ってから</strong>挿し替える（写真では USB がつながっていて電源が入っているように見えます）</li>
+      <li>EXT の <span class="mono">5V IN</span> には何も挿さない。使うのは <span class="mono">5V OUT</span></li>
+      <li>液晶の <span class="mono">VCC</span>（四角いパッドのピン）が <strong>14行目</strong>、<span class="mono">GND</span> が13行目に来ているか確認</li>
+      <li><span class="mono">RESET</span>（11行目）は <strong>5V につながない</strong>。EXT 下の段の <span class="mono">G14 TX</span> につなぐ（信号ピンは 3.3V まで）</li>
+      <li>写真で挿してある2本は「<span class="mono">5V OUT</span> → 右の＋列」「<span class="mono">G</span> → 右の−列」になっているか確認（逆だと壊れます）</li>
+    </ul>
+  </div>
+
+  <div class="toolbar">
+    <div class="seg" role="group" aria-label="表示する配線">
+      <button id="mode-all" type="button" aria-pressed="true">全部（15本）</button>
+      <button id="mode-disp" type="button" aria-pressed="false">表示テストだけ（10本）</button>
+    </div>
+    <span class="progress" id="progress"></span>
+  </div>
+
+  <div class="diagram"><svg id="svg" viewBox="0 0 800 700" role="img" aria-label="EXT端子、ブレッドボード、液晶の配線図"></svg></div>
+  <p class="legend">線の色は図の見分け用です。実物のジャンパーワイヤーは何色でも構いません。ブレッドボード右の色付きタグは「EXT のどの穴から来る線か」を表します。15行目より下と F〜J 列は使いません。</p>
+
+  <section class="list" id="list" aria-label="配線チェックリスト"></section>
+</div>
+
+<script>
+(function(){
+  var NS = 'http://www.w3.org/2000/svg';
+  var svg = document.getElementById('svg');
+  function y(r){ return 258 + (r-1)*31; }
+  var col = {A:310,B:345,C:380,D:415,E:450};
+  var RP = 640, RN = 675;
+  var pins = ['T_IRQ','T_DO','T_DIN','T_CS','T_CLK','SDO','LED','SCK','SDI','DC','RESET','CS','GND','VCC'];
+  var extX = [230,290,350,410,470,530,590];
+  var extTop = ['G26','G23','G22','G11 CLK','G10 MO','G9 MI','G7 CS1'];
+  var extBot = ['5V IN','G','5V OUT','G2','G3','G14','G15'];
+
+  function el(tag, attrs, text){
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    svg.appendChild(e); return e;
+  }
+  function label(x, yy, t, opt){
+    opt = opt || {};
+    return el('text', {x:x, y:yy, 'text-anchor':opt.anchor||'middle', 'font-size':opt.size||12,
+      'font-family':opt.mono?'var(--f-mono)':'var(--f-body)', 'font-weight':opt.bold?700:400,
+      fill:opt.fill||'var(--fg)', stroke:opt.halo===false?'none':'var(--card)', 'stroke-width':opt.halo===false?0:4,
+      'paint-order':'stroke', class:opt.cls||''}, t);
+  }
+
+  // ---- EXT header
+  label(205, 22, 'Cardputer Zero 上面の EXT（本体の印刷ラベルどおり）', {anchor:'start', bold:true, size:13});
+  el('rect', {x:205, y:62, width:410, height:62, rx:6, fill:'var(--socket)'});
+  extX.forEach(function(x){
+    el('rect', {x:x-6, y:72, width:12, height:12, fill:'var(--socket-hole)', stroke:'#555'});
+    el('rect', {x:x-6, y:102, width:12, height:12, fill:'var(--socket-hole)', stroke:'#555'});
+  });
+
+  // ---- breadboard
+  el('rect', {x:290, y:222, width:420, height:462, rx:8, fill:'var(--board)', stroke:'var(--board-edge)'});
+  ['A','B','C','D','E'].forEach(function(c){ label(col[c], 244, c, {fill:'#6b6455', halo:false, size:11, mono:true}); });
+  label(545, 244, 'F〜J（使わない）', {fill:'#8a8270', halo:false, size:11});
+  el('line', {x1:625, y1:228, x2:625, y2:678, stroke:'#e0362c', 'stroke-width':2});
+  el('line', {x1:690, y1:228, x2:690, y2:678, stroke:'#1c7ed6', 'stroke-width':2});
+  label(RP, 214, '＋', {fill:'#e0362c', bold:true, size:16});
+  label(RN, 214, '−', {fill:'#1c7ed6', bold:true, size:16});
+  [236].concat(Array.from({length:14}, function(_,i){return y(i+1);})).forEach(function(yy){
+    el('rect', {x:RP-4, y:yy-4, width:8, height:8, fill:'var(--hole)'});
+    el('rect', {x:RN-4, y:yy-4, width:8, height:8, fill:'var(--hole)'});
+  });
+  for (var r=1; r<=14; r++){
+    ['A','B','C','D','E'].forEach(function(c){
+      el('rect', {x:col[c]-4, y:y(r)-4, width:8, height:8, fill:'var(--hole)'});
+    });
+    label(712, y(r)+4, r + '  ' + pins[r-1], {anchor:'start', mono:true, size:11, fill:'var(--muted)'});
+  }
+
+  // ---- display (screen up, body to the left)
+  el('rect', {x:8, y:230, width:262, height:440, rx:6, fill:'var(--pcb)'});
+  el('rect', {x:18, y:250, width:170, height:400, rx:3, fill:'var(--screen)'});
+  label(103, 440, '2.8インチ液晶', {fill:'#fff', halo:false, bold:true, size:13});
+  label(103, 460, '（画面を上向き）', {fill:'#fff', halo:false, size:11});
+  for (var p=1; p<=14; p++){
+    el('line', {x1:262, y1:y(p), x2:col.A, y2:y(p), stroke:'var(--pin)', 'stroke-width':3});
+    el('rect', {x:col.A-5, y:y(p)-5, width:10, height:10, fill:'var(--pin)'});
+    label(254, y(p)+4, pins[p-1], {anchor:'end', mono:true, size:11, fill:'#fff', halo:false});
+  }
+  el('rect', {x:200, y:y(14)-8, width:16, height:16, fill:'none', stroke:'#fff', 'stroke-width':2});
+  label(103, y(14)+28, '四角いパッド = VCC', {fill:'#fff', halo:false, size:10});
+
+  // ---- power wires EXT -> rails
+  function wire(d, color, cls){ return el('path', {d:d, fill:'none', stroke:color, 'stroke-width':4, 'stroke-linecap':'round', class:cls||''}); }
+  wire('M350 108 C350 190 640 165 640 236', 'var(--w-5v)');
+  wire('M290 108 C290 200 675 175 675 236', 'var(--w-gnd)');
+  el('circle', {cx:640, cy:236, r:5, fill:'var(--w-5v)'});
+  el('circle', {cx:675, cy:236, r:5, fill:'var(--w-gnd)'});
+
+  // rail jumpers
+  [[14,'VCC'],[7,'LED']].forEach(function(a){
+    wire('M'+RP+' '+y(a[0])+' L'+col.E+' '+y(a[0]), 'var(--w-5v)');
+    el('circle', {cx:col.E, cy:y(a[0]), r:5, fill:'var(--w-5v)'});
+    el('circle', {cx:RP, cy:y(a[0]), r:5, fill:'var(--w-5v)'});
+  });
+  wire('M'+RN+' '+y(13)+' L'+col.E+' '+y(13), 'var(--w-gnd)');
+  el('circle', {cx:col.E, cy:y(13), r:5, fill:'var(--w-gnd)'});
+  el('circle', {cx:RN, cy:y(13), r:5, fill:'var(--w-gnd)'});
+
+  // signal stubs with tags
+  var sig = [
+    {row:12, ext:'G7 CS1',  i:6, c:'var(--w-cs)',  tc:'#1d1d1d'},
+    {row:11, ext:'G14 TX',  i:5, c:'var(--w-rst)', tc:'#fff', bot:true},
+    {row:10, ext:'G23',     i:1, c:'var(--w-dc)',  tc:'#1d1d1d'},
+    {row:9,  ext:'G10 MO',  i:4, c:'var(--w-sdi)', tc:'#fff'},
+    {row:8,  ext:'G11 CLK', i:3, c:'var(--w-sck)', tc:'#fff'},
+    {row:4,  ext:'G22',     i:2, c:'var(--w-tcs)', tc:'#fff', touch:true},
+    {row:2,  ext:'G9 MI',   i:5, c:'var(--w-tdo)', tc:'#fff', touch:true},
+    {row:1,  ext:'G26',     i:0, c:'var(--w-tirq)',tc:'#fff', touch:true}
+  ];
+  sig.forEach(function(s){
+    var cls = s.touch ? 'touch' : '';
+    var yy = y(s.row);
+    wire('M'+col.D+' '+yy+' L494 '+yy, s.c, cls);
+    el('circle', {cx:col.D, cy:yy, r:5, fill:s.c, class:cls});
+    el('rect', {x:494, y:yy-10, width:104, height:20, rx:10, fill:s.c, class:cls});
+    label(546, yy+4, 'EXT ' + s.ext, {fill:s.tc, halo:false, mono:true, size:11, bold:true, cls:cls});
+    el('circle', {cx:extX[s.i], cy:s.bot ? 108 : 78, r:11, fill:'none', stroke:s.c, 'stroke-width':3.5, class:cls});
+  });
+
+  // bridges (same signal color, dashed)
+  function bridge(x, r1, r2, color){
+    var a = y(r1), b = y(r2);
+    var p = el('path', {d:'M'+x+' '+a+' C'+(x+22)+' '+(a-24)+' '+(x+22)+' '+(b+24)+' '+x+' '+b,
+      fill:'none', stroke:color, 'stroke-width':4, 'stroke-dasharray':'7 5', 'stroke-linecap':'round', class:'touch'});
+    el('circle', {cx:x, cy:a, r:5, fill:color, class:'touch'});
+    el('circle', {cx:x, cy:b, r:5, fill:color, class:'touch'});
+  }
+  bridge(col.C, 8, 5, 'var(--w-sck)');
+  bridge(col.B, 9, 3, 'var(--w-sdi)');
+
+  // EXT rings for power + 5V IN cross, then labels on top
+  el('circle', {cx:350, cy:108, r:11, fill:'none', stroke:'var(--w-5v)', 'stroke-width':3.5});
+  el('circle', {cx:290, cy:108, r:11, fill:'none', stroke:'#9aa3ab', 'stroke-width':3.5});
+  el('line', {x1:221, y1:99, x2:239, y2:117, stroke:'#ff4d4d', 'stroke-width':3});
+  el('line', {x1:239, y1:99, x2:221, y2:117, stroke:'#ff4d4d', 'stroke-width':3});
+  extX.forEach(function(x, i){
+    label(x, 52, extTop[i], {mono:true, size:11, bold:true});
+    label(x, 146, extBot[i], {mono:true, size:11, bold:true, fill: i===0 ? '#e03131' : 'var(--fg)'});
+  });
+  label(230, 162, '挿さない', {size:10, fill:'#e03131', bold:true});
+
+  // ---- checklist
+  var groups = [
+    {title:'電源（5本）', items:[
+      ['p1','var(--w-5v)','EXT 5V OUT → 右の ＋ 列', '電源を＋列へ', false],
+      ['p2','var(--w-gnd)','EXT G → 右の − 列', 'GND を−列へ', false],
+      ['p3','var(--w-5v)','＋ 列 → E14', '14行目 VCC', false],
+      ['p5','var(--w-5v)','＋ 列 → E7', '7行目 LED（バックライト）', false],
+      ['p6','var(--w-gnd)','− 列 → E13', '13行目 GND', false]]},
+    {title:'信号（8本）', items:[
+      ['s1','var(--w-cs)','EXT G7 CS1 → D12', '12行目 CS', false],
+      ['s8','var(--w-rst)','EXT G14 TX → D11', '11行目 RESET（5V に直結しない）', false],
+      ['s2','var(--w-dc)','EXT G23 → D10', '10行目 DC', false],
+      ['s3','var(--w-sdi)','EXT G10 MO → D9', '9行目 SDI(MOSI)', false],
+      ['s4','var(--w-sck)','EXT G11 CLK → D8', '8行目 SCK', false],
+      ['s5','var(--w-tcs)','EXT G22 → D4', '4行目 T_CS', true],
+      ['s6','var(--w-tdo)','EXT G9 MI → D2', '2行目 T_DO', true],
+      ['s7','var(--w-tirq)','EXT G26 → D1', '1行目 T_IRQ', true]]},
+    {title:'ブレッドボード上の分岐（2本）', items:[
+      ['b1','var(--w-sck)','C8 → C5', 'SCK を T_CLK にも分ける', true],
+      ['b2','var(--w-sdi)','B9 → B3', 'SDI を T_DIN にも分ける', true]]}
+  ];
+  var KEY = 'ds-wiring-checks';
+  var state = {};
+  try { state = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch(e) { state = {}; }
+  function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e) {} }
+
+  var list = document.getElementById('list');
+  groups.forEach(function(g){
+    var sec = document.createElement('div'); sec.className = 'group';
+    var h = document.createElement('h2'); h.textContent = g.title; sec.appendChild(h);
+    var box = document.createElement('div'); box.className = 'box';
+    g.items.forEach(function(it){
+      var row = document.createElement('div');
+      row.className = 'item' + (it[4] ? ' touch' : '') + (state[it[0]] ? ' done' : '');
+      var cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = 'cb-' + it[0]; cb.checked = !!state[it[0]];
+      var sw = document.createElement('span'); sw.className = 'sw'; sw.style.background = it[1];
+      var lb = document.createElement('label'); lb.htmlFor = cb.id;
+      lb.innerHTML = '<span class="mono"></span><br><span class="to"></span>';
+      lb.firstChild.textContent = it[2]; lb.lastChild.textContent = it[3];
+      var tg = document.createElement('span'); tg.className = 'tag'; tg.textContent = it[4] ? 'タッチ用' : '表示に必要';
+      cb.addEventListener('change', function(){ state[it[0]] = cb.checked; row.classList.toggle('done', cb.checked); save(); update(); });
+      row.append(cb, sw, lb, tg); box.appendChild(row);
+    });
+    sec.appendChild(box); list.appendChild(sec);
+  });
+
+  var root = document.getElementById('root');
+  var bAll = document.getElementById('mode-all'), bDisp = document.getElementById('mode-disp');
+  function setMode(disp){
+    root.classList.toggle('dim', disp);
+    bAll.setAttribute('aria-pressed', String(!disp)); bDisp.setAttribute('aria-pressed', String(disp));
+    try { localStorage.setItem('ds-wiring-mode', disp ? 'disp' : 'all'); } catch(e) {}
+    update();
+  }
+  function update(){
+    var disp = root.classList.contains('dim');
+    var all = [].concat.apply([], groups.map(function(g){ return g.items; })).filter(function(it){ return !disp || !it[4]; });
+    var done = all.filter(function(it){ return state[it[0]]; }).length;
+    document.getElementById('progress').textContent = '接続済み ' + done + ' / ' + all.length + ' 本';
+  }
+  bAll.addEventListener('click', function(){ setMode(false); });
+  bDisp.addEventListener('click', function(){ setMode(true); });
+  var m = 'all'; try { m = localStorage.getItem('ds-wiring-mode') || 'all'; } catch(e) {}
+  setMode(m === 'disp');
+})();
+</script>
