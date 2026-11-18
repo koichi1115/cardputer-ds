@@ -7,7 +7,7 @@ cd "$(dirname "$0")"
 FW=/boot/firmware
 
 echo "== パッケージ"
-apt-get install -y device-tree-compiler python3-pil python3-evdev libdrm-tests evtest
+apt-get install -y device-tree-compiler python3-pil python3-evdev python3-numpy fonts-ipafont-gothic libdrm-tests evtest
 
 echo "== 初期化データ"
 python3 tools/make_init_bin.py /lib/firmware/cardputerzero,ili9341_ext.bin
@@ -33,7 +33,16 @@ systemctl daemon-reload
 echo "== G14 を RESET に使うためシリアル端末を止める"
 systemctl disable --now serial-getty@ttyS0.service 2>/dev/null || true
 
+echo "== 上画面アプリ (/opt/cardputer-ds, ds-top.service)"
+mkdir -p /opt/cardputer-ds
+rm -rf /opt/cardputer-ds/app /opt/cardputer-ds/touch
+cp -r app touch /opt/cardputer-ds/
+install -m 644 systemd/ds-top.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable ds-top.service
+
 echo
 echo "完了。sudo reboot で反映されます。"
-echo "確認: sudo modetest -M panel-mipi-dbi -s 34@37:320x240   (カラーバー)"
+echo "上画面アプリ: 起動後に自動で表示 (止める: sudo systemctl stop ds-top)"
+echo "確認: sudo modetest -M panel-mipi-dbi -s 34@37:320x240   (カラーバー。ds-top を止めてから)"
 echo "      sudo python3 touch/touch_test.py                    (タッチ)"

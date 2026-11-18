@@ -22,6 +22,30 @@ sudo modetest -M panel-mipi-dbi -s 34@37:320x240   # 上画面にカラーバー
 sudo python3 touch/touch_test.py                    # タッチ座標の表示
 ```
 
+## 上画面アプリ（app/）
+
+外付け液晶に、時計・システム状態・タッチお絵描きの3ページを表示する土台です。下のタブをタッチして切り替えます。`install.sh` で `/opt/cardputer-ds` に入り、`ds-top.service` として起動時に自動で動きます。
+
+| ページ | 内容 |
+|---|---|
+| HOME | 時計、日付、Wi-Fi の SSID と IP |
+| SYSTEM | CPU 温度、負荷、メモリ、バッテリー |
+| TOUCH | 指やペンで描ける（Color / Clear ボタン） |
+
+```bash
+sudo systemctl stop ds-top              # 止める（modetest などで画面を使うとき）
+sudo python3 app/main.py                # 手動で起動（Ctrl+C で終了）
+python3 app/main.py --preview out       # 実機なしで各ページを PNG に書き出す
+python3 -m unittest discover -s tests   # 実機なしで動くテスト
+```
+
+仕組み:
+
+- `app/drm.py`: libdrm を ctypes で呼び、ダムバッファを作ってモードを設定する（Cardputer は fbcon が無効なので、`/dev/fb_ext` に書くだけでは画面がオンにならない）。前のフレームとの差分の範囲だけを `DirtyFB` で送るので、時計の秒だけが変わるときは数百バイトで済む。
+- `app/touch.py`: `/dev/input/ds-touch` を別スレッドで読み、`touch/touch_cal.json` で画面座標に変換して down / move / up のイベントにする。
+- `app/ui.py`: PIL で 320×240 の画像を描く。ページとボタンの最小限の仕組み。
+- 触っている間は 15fps、2秒触らなければ 4fps に落として、内蔵液晶と共用の SPI と CPU を空ける。
+
 ## 配線
 
 液晶はブレッドボードの A 列 1〜14 行目に、画面を上にして挿す（VCC = 四角いパッドが 14 行目）。EXT のピン名は本体の印刷ラベルどおり。
