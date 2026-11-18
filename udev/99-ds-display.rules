@@ -1,0 +1,6 @@
+# 外付け 2.8" ILI9341 -> /dev/fb_ext, /dev/dri/ds-external
+SUBSYSTEM=="graphics", KERNEL=="fb*", ATTRS{of_node/compatible}=="*ili9341*", SYMLINK+="fb_ext"
+# seat-ds に入れてデスクトップ(labwc)に画面を取られないようにする
+SUBSYSTEM=="drm", KERNEL=="card*", ENV{ID_PATH}=="platform-3f204000.spi-cs-1", SYMLINK+="dri/ds-external", ENV{ID_SEAT}="seat-ds"
+# タッチ -> /dev/input/ds-touch
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="ADS7846 Touchscreen", SYMLINK+="input/ds-touch", ENV{ID_SEAT}="seat-ds"
