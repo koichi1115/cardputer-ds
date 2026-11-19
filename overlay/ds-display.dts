@@ -67,7 +67,9 @@
                 interrupts = <26 2>;
                 pendown-gpio = <&gpio 26 1>;
                 ti,x-plate-ohms = /bits/ 16 <60>;
-                ti,pressure-max = /bits/ 16 <255>;
+                /* 軽く触れたときほど抵抗値(Rt)が大きくなり、pressure-max を超えると捨てられる。
+                   255 だと強く押さないと反応しないので広げてある */
+                ti,pressure-max = /bits/ 16 <1024>;
             };
         };
     };

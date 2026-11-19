@@ -40,6 +40,27 @@ def preview(outdir):
     print("preview written to", outdir)
 
 
+class StatusPoller:
+    """状態の収集 (iw コマンドの起動など) は遅いので、別スレッドで数秒ごとに行う。
+    描画ループはタッチを待つことだけに専念させる。"""
+
+    def __init__(self, interval=3.0):
+        import threading
+        self.interval = interval
+        self.data = collect()
+        self.version = 0
+        threading.Thread(target=self._run, daemon=True).start()
+
+    def _run(self):
+        while True:
+            time.sleep(self.interval)
+            try:
+                self.data = collect()
+                self.version += 1
+            except Exception as e:   # 状態が読めなくても画面は止めない
+                print("status:", e, file=sys.stderr)
+
+
 def run(fps):
     from drm import DrmDisplay
     from touch import TouchReader
@@ -50,27 +71,41 @@ def run(fps):
         print("タッチなしで起動:", e, file=sys.stderr)
         touch = None
     app = ui.App()
+    poller = StatusPoller()
     stop = []
     signal.signal(signal.SIGTERM, lambda *a: stop.append(1))
-    st = collect()
-    st_time = time.monotonic()
-    last_touch = 0.0
+    seen_version = -1
+    last_sec = None
+    min_frame = 1 / fps
+    last_draw = 0.0
     try:
         while not stop:
-            t0 = time.monotonic()
-            if t0 - st_time >= 2:
-                st = collect()
-                st_time = t0
-            st["now"] = datetime.datetime.now()
-            events = touch.poll() if touch else []
+            now = time.time()
+            # 次の秒の切り替わりまで、タッチを待つ (触ればすぐ起きる)
+            timeout = 1.0 - (now % 1.0)
+            events = touch.wait(timeout) if touch else (time.sleep(timeout) or [])
+            dirty = False
             for ev in events:
-                app.touch(ev)
-            if events:
-                last_touch = t0
+                dirty |= bool(app.touch(ev)) or ev.kind != "move" or app.page.title == "TOUCH"
+            sec = int(time.time())
+            if sec != last_sec:
+                last_sec = sec
+                dirty = True
+            if poller.version != seen_version:
+                seen_version = poller.version
+                dirty = True
+            if not dirty:
+                continue
+            # 指でなぞっている間は描画を fps までに抑え、その間のイベントはまとめて反映する
+            wait = min_frame - (time.monotonic() - last_draw)
+            if wait > 0 and events and events[-1].kind == "move":
+                time.sleep(wait)
+                for ev in (touch.wait(0) if touch else []):
+                    app.touch(ev)
+            st = dict(poller.data)
+            st["now"] = datetime.datetime.now()
             disp.show(app.render(st))
-            # 触っている間は fps どおり、2秒触らなければ 4fps に落として CPU と SPI を空ける
-            period = 1 / fps if t0 - last_touch < 2 else 0.25
-            time.sleep(max(0.0, period - (time.monotonic() - t0)))
+            last_draw = time.monotonic()
     except KeyboardInterrupt:
         pass
     finally:
@@ -80,6 +115,6 @@ def run(fps):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--preview", metavar="DIR", help="実機なしで各ページを PNG に書き出す")
-    ap.add_argument("--fps", type=float, default=15)
+    ap.add_argument("--fps", type=float, default=20)
     a = ap.parse_args()
     preview(a.preview) if a.preview else run(a.fps)

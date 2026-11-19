@@ -48,7 +48,12 @@ class TouchState:
         self.last_xy = None
 
     def feed(self, etype, code, value):
-        """生イベントを1つ受け取り、出せる TouchEvent があれば返す。"""
+        """生イベントを1つ受け取り、出せる TouchEvent のリストを返す (多くは空)。
+
+        軽く素早いタップでは「押した」と「離した」が同じ SYN に入ることがある。
+        その場合も down → up の順に両方出す (片方だけだとタップを取りこぼす)。
+        """
+        out = []
         if etype == self.EV_ABS and code == self.ABS_X:
             self.rx = value
         elif etype == self.EV_ABS and code == self.ABS_Y:
@@ -59,21 +64,21 @@ class TouchState:
             else:
                 self.pending_up = True
         elif etype == self.EV_SYN:
-            if self.pending_up:
-                self.pending_up = False
-                self.down = False
-                x, y = self.last_xy or self.cal.to_screen(self.rx, self.ry)
-                return TouchEvent("up", x, y)
             xy = self.cal.to_screen(self.rx, self.ry)
             if self.pending_down:
                 self.pending_down = False
                 self.down = True
                 self.last_xy = xy
-                return TouchEvent("down", *xy)
-            if self.down and xy != self.last_xy:
+                out.append(TouchEvent("down", *xy))
+            elif self.down and not self.pending_up and xy != self.last_xy:
                 self.last_xy = xy
-                return TouchEvent("move", *xy)
-        return None
+                out.append(TouchEvent("move", *xy))
+            if self.pending_up:
+                self.pending_up = False
+                if self.down:
+                    self.down = False
+                    out.append(TouchEvent("up", *(self.last_xy or xy)))
+        return out
 
 
 class TouchReader:
@@ -88,12 +93,15 @@ class TouchReader:
 
     def _run(self):
         for ev in self.dev.read_loop():
-            out = self.state.feed(ev.type, ev.code, ev.value)
-            if out:
+            for out in self.state.feed(ev.type, ev.code, ev.value):
                 self.events.put(out)
 
-    def poll(self):
-        out = []
+    def wait(self, timeout):
+        """イベントが来るまで最大 timeout 秒待ち、来ていたものを全部返す。"""
+        try:
+            out = [self.events.get(timeout=max(0.0, timeout))]
+        except queue.Empty:
+            return []
         while True:
             try:
                 out.append(self.events.get_nowait())

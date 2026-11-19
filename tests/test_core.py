@@ -49,16 +49,31 @@ class TestTouch(unittest.TestCase):
     def test_event_sequence(self):
         s = touch.TouchState(self.cal)
         K, A, S = s.EV_KEY, s.EV_ABS, s.EV_SYN
-        out = [s.feed(K, s.BTN_TOUCH, 1), s.feed(A, s.ABS_X, 2055), s.feed(A, s.ABS_Y, 2110)]
-        down = s.feed(S, 0, 0)
+        self.assertEqual(s.feed(K, s.BTN_TOUCH, 1) + s.feed(A, s.ABS_X, 2055) + s.feed(A, s.ABS_Y, 2110), [])
+        (down,) = s.feed(S, 0, 0)
         self.assertEqual(down.kind, "down")
         self.assertTrue(150 <= down.x <= 165 and 110 <= down.y <= 125)
         s.feed(A, s.ABS_Y, 1800)
-        self.assertEqual(s.feed(S, 0, 0).kind, "move")
-        self.assertIsNone(s.feed(S, 0, 0))          # 位置が変わらなければ何も出ない
+        self.assertEqual([e.kind for e in s.feed(S, 0, 0)], ["move"])
+        self.assertEqual(s.feed(S, 0, 0), [])          # 位置が変わらなければ何も出ない
         s.feed(K, s.BTN_TOUCH, 0)
-        self.assertEqual(s.feed(S, 0, 0).kind, "up")
-        self.assertEqual(out, [None, None, None])
+        self.assertEqual([e.kind for e in s.feed(S, 0, 0)], ["up"])
+
+    def test_quick_tap_in_one_report(self):
+        # 押して離すまでが1回の SYN に収まっても、down と up の両方が出る
+        s = touch.TouchState(self.cal)
+        s.feed(s.EV_KEY, s.BTN_TOUCH, 1)
+        s.feed(s.EV_ABS, s.ABS_X, 600)
+        s.feed(s.EV_ABS, s.ABS_Y, 2100)
+        s.feed(s.EV_KEY, s.BTN_TOUCH, 0)
+        evs = s.feed(s.EV_SYN, 0, 0)
+        self.assertEqual([e.kind for e in evs], ["down", "up"])
+        self.assertEqual((evs[0].x, evs[0].y), (evs[1].x, evs[1].y))
+
+    def test_up_without_down_is_ignored(self):
+        s = touch.TouchState(self.cal)
+        s.feed(s.EV_KEY, s.BTN_TOUCH, 0)
+        self.assertEqual(s.feed(s.EV_SYN, 0, 0), [])
 
 
 class TestStatus(unittest.TestCase):
